@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SAFAR - Explore Morocco</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:'Poppins',sans-serif;scroll-behavior:smooth}
+body{background:#0f0e0c;color:white}
+nav{position:fixed;top:0;width:100%;display:flex;justify-content:space-between;padding:18px 8%;z-index:100;background:rgba(15,14,12,0.8);backdrop-filter:blur(15px);border-bottom:1px solid #222}
+.logo{font-weight:900;font-size:26px} .logo span{color:#C1272D}
+.hero{height:100vh;position:relative;display:flex;align-items:center;padding:0 8%;overflow:hidden}
+.hero-bg{position:absolute;inset:0;background:url('https://images.unsplash.com/photo-1597212618440-44399016910e?q=80') center/cover;filter:brightness(0.5)}
+.hero-content{position:relative;z-index:2} .hero h1{font-size:85px;line-height:0.9}
+.hero h1 span{background:linear-gradient(90deg,#C1272D,#D9A679);-webkit-background-clip:text;color:transparent}
+.btn{padding:14px 28px;border-radius:40px;border:none;font-weight:bold;cursor:pointer;background:white;color:black;transition:.3s;display:inline-block;text-decoration:none}
+.btn:hover{transform:scale(1.05)}
+.cities{padding:90px 8%;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:25px}
+.city-card{height:400px;border-radius:25px;overflow:hidden;position:relative;cursor:pointer;transition:.6s}
+.city-card:hover{transform:translateY(-10px)}
+.city-card img{width:100%;height:100%;object-fit:cover;transition:.8s} .city-card:hover img{transform:scale(1.15)}
+.city-overlay{position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,0.85),transparent);padding:25px;display:flex;flex-direction:column;justify-content:flex-end}
+.tag{padding:4px 12px;border-radius:20px;font-size:11px;font-weight:bold;display:inline-block;margin-bottom:10px}
+#mapSection{padding:80px 8%;background:#15130f} .map-wrapper{display:flex;gap:30px;flex-wrap:wrap}
+#map{height:500px;flex:2;min-width:320px;border-radius:20px} .city-list{flex:1;min-width:260px;display:flex;flex-direction:column;gap:10px}
+.city-btn{padding:16px 20px;border-radius:14px;border:1px solid #2a2a2a;background:#1f1d19;color:white;text-align:left;cursor:pointer;transition:.3s}
+.city-btn.active{background:#C1272D;border-color:#C1272D}
+
+/* DETAIL PAGE */
+#detail{position:fixed;inset:0;z-index:200;background:#0f0e0c;overflow-y:auto;transform:translateY(100%);transition:.6s cubic-bezier(.77,0,.175,1);padding:0}
+#detail.open{transform:translateY(0)}
+.detail-hero{height:60vh;position:relative}
+.detail-hero img{width:100%;height:100%;object-fit:cover}
+.detail-hero-overlay{position:absolute;inset:0;background:linear-gradient(to top,#0f0e0c,transparent);display:flex;align-items:flex-end;padding:40px 8%}
+.detail-content{padding:40px 8%;display:grid;grid-template-columns:2fr 1fr;gap:40px}
+.detail-text h2{font-size:50px;margin-bottom:15px}
+.detail-meta{display:flex;gap:15px;margin:15px 0;color:#999}
+.gallery-mini{display:grid;grid-template-columns:1fr 1fr;gap:15px;margin-top:20px}
+.gallery-mini img{height:200px;border-radius:15px;object-fit:cover;width:100%}
+.close-btn{position:fixed;top:25px;right:25px;width:50px;height:50px;border-radius:50%;background:white;color:black;border:none;font-size:24px;cursor:pointer;z-index:201}
+.info-box{background:#1f1d19;border-radius:20px;padding:25px;border:1px solid #2a2a2a}
+.info-box h4{margin-bottom:15px;color:#D9A679}
+.info-box li{margin:8px 0;color:#ccc;list-style:none}
+
+/* FOOTER */
+footer{background:#080704;border-top:1px solid #1f1d19;padding:60px 8% 30px;text-align:center;margin-top:60px}
+.footer-logo{font-size:32px;font-weight:900;margin-bottom:15px}
+.team{display:flex;justify-content:center;gap:15px;flex-wrap:wrap;margin:20px 0}
+.team span{background:#1f1d19;border:1px solid #2a2a2a;padding:8px 18px;border-radius:30px;font-size:14px}
+.copy{color:#666;font-size:13px;margin-top:30px;line-height:1.6}
+
+@media(max-width:900px){.hero h1{font-size:48px} .detail-content{grid-template-columns:1fr} #map{height:350px}}
+</style>
+</head>
+<body>
+
+<nav><div class="logo">SAFAR<span>.</span></div><div>Explore Morocco 🇲🇦</div></nav>
+
+<section class="hero">
+<div class="hero-bg"></div>
+<div class="hero-content">
+<h1>Le Maroc<br><span>Autrement.</span></h1>
+<p style="color:#ccc;margin:20px 0;max-width:500px;font-size:18px">Clique sur une ville, découvre ses paysages magnifiques, sa couleur et sa position exacte.</p>
+<a href="#cities" class="btn">Explorer →</a>
+</div>
+</section>
+
+<section class="cities" id="cities"></section>
+
+<section id="mapSection">
+<h2 style="font-size:38px">Carte interactive</h2>
+<div class="map-wrapper" style="margin-top:25px"><div id="map"></div><div class="city-list" id="cityList"></div></div>
+</section>
+
+<!-- DETAIL MODAL -->
+<div id="detail">
+<button class="close-btn" onclick="closeDetail()">✕</button>
+<div class="detail-hero"><img id="dImg" src=""><div class="detail-hero-overlay"><div><span id="dTag" class="tag"></span><h2 id="dTitle"></h2><div class="detail-meta"><span id="dRegion"></span><span>•</span><span id="dBest"></span></div></div></div></div>
+<div class="detail-content">
+<div class="detail-text">
+<p id="dDesc" style="color:#ccc;font-size:18px;line-height:1.7"></p>
+<h3 style="margin:30px 0 15px">Que voir absolument ?</h3><ul id="dSpots"></ul>
+<div class="gallery-mini" id="dGallery"></div>
+</div>
+<div class="info-box">
+<h4>📍 Infos pratiques</h4>
+<p><b>Spécialité culinaire:</b> <span id="dFood"></span></p><br>
+<p><b>Activités:</b> <span id="dAct"></span></p><br>
+<p><b>Couleur représentative:</b> <span id="dColor"></span></p><br>
+<a id="dMapLink" target="_blank" class="btn" style="width:100%;text-align:center;margin-top:15px">Ouvrir Google Maps 🗺️</a>
+<iframe id="dMapFrame" width="100%" height="200" style="border:0;border-radius:15px;margin-top:15px" loading="lazy"></iframe>
+</div>
+</div>
+</div>
+
+<footer>
+<div class="footer-logo">SAFAR.</div>
+<p style="color:#aaa">Plateforme touristique pour explorer les villes et paysages magnifiques du Maroc.</p>
+<div class="team">
+<span>🔴 Salaheddine</span><span>🔵 Ayoub</span><span>🟡 Yassine</span><span>🟢 Ahmed</span>
+</div>
+<div class="copy">
+© 2026 SAFAR Morocco. Tous droits réservés.<br>
+Conçu et développé avec ❤️ à Marrakech, Maroc par <b>Salaheddine, Ayoub, Yassine et Ahmed</b><br>
+Projet FSSM - Conception Web | Images: Unsplash | Cartes: Leaflet & Google Maps
+</div>
+</footer>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const cities = [
+{ id:"Marrakech", lat:31.6295,lng:-7.9811, color:"#C1272D", tag:"VILLE OCRE", region:"Marrakech-Safi", best:"Oct - Mars", img:"https://images.unsplash.com/photo-1559128010-7c1ad6e1b6a5?q=80", gallery:["https://images.unsplash.com/photo-1539650116574-75c0a97d5aeb?q=80","https://images.unsplash.com/photo-1597212618440-44399016910e?q=80"], desc:"Marrakech, la ville rouge aux murs d'ocre, est le cœur battant du tourisme marocain. De Jamaa El Fna animée jusqu'aux jardins paisibles de Majorelle, chaque ruelle raconte une histoire. Couleur ocre #C1272D qui représente la terre de la ville.", food:"Tajine, Pastilla, Msemen", act:"Calèche, Quad dans la palmeraie, Hammam", spots:["Place Jamaa El Fna","Jardin Majorelle","Palais Bahia","Souks et Médina"] },
+{ id:"Chefchaouen", lat:35.1716,lng:-5.2697, color:"#2E86DE", tag:"VILLE BLEUE", region:"Tanger-Tetouan", best:"Mars - Juin", img:"https://images.unsplash.com/photo-1539020149716-461461d1f2c2?q=80", gallery:["https://images.unsplash.com/photo-1524492412937-b28074a5d7da?q=80","https://images.unsplash.com/photo-1505765050516-f72dcac9c60e?q=80"], desc:"Perchée dans le Rif, Chefchaouen est célèbre pour ses maisons bleues et blanches. Un labyrinthe photogénique où le temps s'arrête. La couleur bleue #2E86DE symbolise le ciel et la spiritualité.", food:"Fromage de chèvre, Tagine Rifain", act:"Randonnée, Photo tour, Cascades d'Akchour", spots:["Médina Bleue","Place Outa El Hammam","Kasbah","Montagnes du Rif"] },
+{ id:"Merzouga", lat:31.0800,lng:-4.0100, color:"#D9A679", tag:"SAHARA DORÉ", region:"Drâa-Tafilalet", best:"Oct - Avril", img:"https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?q=80", gallery:["https://images.unsplash.com/photo-1489493887464-892be6d1daae?q=80","https://images.unsplash.com/photo-1509316785289-025f5b846b35?q=80"], desc:"Les dunes de l'Erg Chebbi à Merzouga sont l'image carte postale du Sahara. Dunes dorées de 150m, nuits étoilées et bivouacs berbères. Couleur sable #D9A679.", food:"Madfouna (pizza berbère), Thé Touareg", act:"Dromadaire au coucher du soleil, 4x4, Nuit sous tente", spots:["Erg Chebbi","Lac Dayet Srji","Bivouac Berbère","Lever de soleil sur les dunes"] },
+{ id:"Fès", lat:34.0331,lng:-5.0003, color:"#2E7D32", tag:"CAPITALE SPIRITUELLE", region:"Fès-Meknès", best:"Toute l'année", img:"https://images.unsplash.com/photo-1518684079-3c830dcef090?q=80", gallery:["https://images.unsplash.com/photo-1559128010-7c1ad6e1b6a5?q=80","https://images.unsplash.com/photo-1539650116574-75c0a97d5aeb?q=80"], desc:"Fès abrite la plus grande médina médiévale au monde, classée UNESCO. Tanneries colorées, université Al Quaraouiyine (la plus vieille au monde). Vert #2E7D32 pour l'Islam et l'artisanat.", food:"Harira, Briouates, Cornes de gazelle", act:"Visite tanneries, Atelier zellige, Médersa", spots:["Médina de Fès El Bali","Tanneries Chouara","Université Al Quaraouiyine","Portes Bleues Bab Boujloud"] },
+{ id:"Essaouira", lat:31.5085,lng:-9.7595, color:"#5DADE2", tag:"VILLE DU VENT", region:"Marrakech-Safi", best:"Avril - Oct", img:"https://images.unsplash.com/photo-1576485290814-1c72c0e1a38d?q=80", gallery:["https://images.unsplash.com/photo-1533105079780-92b9be482077?q=80","https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80"], desc:"Essaouira, la perle de l'Atlantique, mélange remparts portugais, mouettes et Gnawa. Vent constant pour le kitesurf. Bleu océan #5DADE2.", food:"Poisson grillé, Huître, Pastilla de fruits de mer", act:"Kitesurf, Festival Gnawa, Port de pêche", spots:["Médina d'Essaouira","Port et Remparts","Île de Mogador","Plage d'Essaouira"] },
+{ id:"Casablanca", lat:33.5899,lng:-7.6039, color:"#ffffff", tag:"MÉTROPOLE", region:"Casablanca-Settat", best:"Toute l'année", img:"https://images.unsplash.com/photo-1539650116574-75c0a97d5aeb?q=80", gallery:["https://images.unsplash.com/photo-1559128010-7c1ad6e1b6a5?q=80","https://images.unsplash.com/photo-1597212618440-44399016910e?q=80"], desc:"Casablanca, capitale économique, entre mosquée Hassan II (plus grande d'Afrique) et art déco. Modernité et tradition.", food:"Poisson, Bastilla, Casablancaise", act:"Mosquée Hassan II, Corniche Ain Diab", spots:["Mosquée Hassan II","Ancienne Médina","Quartier Habous","Twin Center"] },
+];
+
+const cityContainer = document.getElementById('cities');
+const cityList = document.getElementById('cityList');
+cities.forEach(c=>{
+  cityContainer.innerHTML+=`<div class="city-card" onclick="openDetail('${c.id}')"><img src="${c.img}"><div class="city-overlay"><span class="tag" style="background:${c.color};color:${c.color=='#ffffff'?'black':'white'}">${c.tag}</span><h3>${c.id}</h3></div></div>`;
+  cityList.innerHTML+=`<button class="city-btn" data-city="${c.id}" onclick="flyTo('${c.id}')">${c.id}</button>`;
+});
+
+const map = L.map('map').setView([31.6,-7.98],6);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
+let marker = L.marker([31.6295,-7.9811]).addTo(map);
+
+function flyTo(id){
+  const c=cities.find(x=>x.id===id);
+  map.flyTo([c.lat,c.lng],10,{duration:1.5});
+  marker.setLatLng([c.lat,c.lng]).bindPopup(c.id).openPopup();
+  document.querySelectorAll('.city-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelector(`.city-btn[data-city="${id}"]`)?.classList.add('active');
+}
+
+function openDetail(id){
+  const c=cities.find(x=>x.id===id);
+  document.getElementById('dImg').src=c.img;
+  document.getElementById('dTag').innerText=c.tag; document.getElementById('dTag').style.background=c.color; document.getElementById('dTag').style.color=c.color=='#ffffff'?'black':'white';
+  document.getElementById('dTitle').innerText=c.id;
+  document.getElementById('dRegion').innerText=c.region; document.getElementById('dBest').innerText=c.best;
+  document.getElementById('dDesc').innerText=c.desc;
+  document.getElementById('dFood').innerText=c.food; document.getElementById('dAct').innerText=c.act; document.getElementById('dColor').innerText=c.color;
+  document.getElementById('dSpots').innerHTML=c.spots.map(s=>`<li>📍 ${s}</li>`).join('');
+  document.getElementById('dGallery').innerHTML=c.gallery.map(g=>`<img src="${g}">`).join('');
+  document.getElementById('dMapLink').href=`https://www.google.com/maps/search/${c.id}+Morocco`;
+  document.getElementById('dMapFrame').src=`https://www.google.com/maps?q=${c.lat},${c.lng}&z=12&output=embed`;
+  document.getElementById('detail').classList.add('open');
+  flyTo(id);
+}
+function closeDetail(){ document.getElementById('detail').classList.remove('open'); }
+cityContainer.addEventListener('click',()=>{}); // handled
+flyTo('Marrakech');
+</script>
+</body>
+</html>
